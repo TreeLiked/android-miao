@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: android-miao
+
+
+  datasource:
+    # 使用druid数据源
+    type: com.alibaba.druid.pool.DruidDataSource
+
+
+server:
+  port: 8880
+
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://211.159.217.99:8888/eureka
+
+
+file:
+  image:
+    path: file:/Users/lqs2/Desktop/images/
+
+

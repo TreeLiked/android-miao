@@ -1,0 +1,173 @@
+package com.example.controller;
+
+import com.example.entity.File;
+import com.example.mapper.FileMapper;
+import com.example.mapper.MemoMapper;
+import com.example.mapper.UserMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * @Author lqs2
+ * @Description TODO
+ * @Date 2018/8/6, Mon
+ */
+@SuppressWarnings("Duplicates")
+@Slf4j
+@RestController
+@RequestMapping("android")
+public class AndroidController {
+
+    private final FileMapper fileMapper;
+    private final UserMapper userMapper;
+    private final MemoMapper memoMapper;
+    private final ObjectMapper objectMapper;
+
+    @Autowired
+    public AndroidController(FileMapper fileMapper, UserMapper userMapper, MemoMapper memoMapper, ObjectMapper objectMapper) {
+        this.fileMapper = fileMapper;
+        this.userMapper = userMapper;
+        this.memoMapper = memoMapper;
+        this.objectMapper = objectMapper;
+    }
+
+
+    //    File
+    @RequestMapping(value = "/file/gmf", method = {RequestMethod.POST})
+    @Transactional
+    public String getMyFile(String un, String pwd) throws Exception {
+        if (isLegalUser(un, pwd)) {
+
+            log.info("{}, {}, 认证成功， 查看文件", un, pwd);
+            return objectMapper.writeValueAsString(fileMapper.getFileByUser(un));
+        }
+        return "0";
+    }
+
+    @RequestMapping(value = "/file/gmm", method = {RequestMethod.POST})
+    @Transactional
+    public String getMyMemo(String un, String pwd) throws Exception {
+        if (isLegalUser(un, pwd)) {
+            log.info("{}, {}, 认证成功，查看便签", un, pwd);
+            return objectMapper.writeValueAsString(memoMapper.getMemoAmountByUsername(un));
+        }
+        return "0";
+    }
+
+    @RequestMapping(value = "/file/smf", method = {RequestMethod.POST})
+    @Transactional
+    public String searchMyFile(String un, String pwd, String fileNo) throws Exception {
+        if (isLegalUser(un, pwd)) {
+            log.info("{}, 搜索文件", fileNo);
+            File file = fileMapper.bringFileOut(fileNo);
+            if (file != null) {
+                if (file.getFile_destination() != null && !"".equals(file.getFile_destination())) {
+                    if ((un.equals(file.getFile_destination()) || file.getFile_post_author().equals(un))) {
+                        return objectMapper.writeValueAsString(file);
+                    }
+                    return "no";
+                }
+                return objectMapper.writeValueAsString(file);
+            }
+            return "null";
+        }
+        return "0";
+    }
+
+    @RequestMapping(value = "/file/rmf", method = {RequestMethod.POST})
+    @Transactional
+    public String removeFile(String un, String pwd, String file_id) throws Exception {
+
+        if (isLegalUser(un, pwd)) {
+            log.info("{}, {}, 认证成功， 删除文件", un, pwd);
+            Integer result;
+            try {
+                result = fileMapper.removeFileById(file_id);
+                return result == 1 ? "1" : "0";
+            } catch (Exception e) {
+                log.error(e.toString());
+            }
+        }
+        return "0";
+    }
+
+    @SuppressWarnings("Duplicates")
+    @RequestMapping(value = "/file/gnf", method = {RequestMethod.GET})
+    public String generateNewFile(String filename) {
+        Integer r1;
+        try {
+            r1 = fileMapper.getFileRandomNo();
+            String suffix = filename.substring(filename.lastIndexOf(".") + 1);
+            if (r1 != 0) {
+                return r1.toString() + "/" + r1 + "." + suffix;
+            }
+        } catch (Exception e) {
+            log.error(e.toString());
+        }
+        return "0";
+    }
+
+    @RequestMapping(value = "file/dfc", method = RequestMethod.GET)
+    public void deleteFileCloud(String bucket_id) {
+
+
+    }
+
+    @RequestMapping(value = "/file/ifr", method = {RequestMethod.POST})
+    @Transactional
+    public String insertFileRecord(String file_post_author, int fileNo, String fileName, String attachment, String destination, String fileSize) {
+        log.info("添加文件记录{}", fileSize);
+        log.info(file_post_author);
+        log.info(String.valueOf(fileNo));
+        log.info(fileName);
+        log.info(attachment);
+        log.info(destination);
+        log.info(fileSize);
+
+        String suffix = fileName.substring(fileName.lastIndexOf(".") + 1);
+        try {
+            if (destination != null) {
+                userMapper.sendMsg(file_post_author, destination, 2, "收到一个文件【 名称：" + fileName + "，大小：" + fileSize + "，编号：" + fileNo + " 】，来源：" + file_post_author, "null");
+            }
+            Integer integer = fileMapper.insertFileRecord(String.valueOf(fileNo), fileNo + "." + suffix, 365, fileName, attachment, destination, fileSize, file_post_author);
+            return integer == 1 ? "1" : "0";
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return "0";
+    }
+
+
+    private boolean isLegalUser(String username, String password) throws Exception {
+        if (!username.contains("@")) {
+            return userMapper.hasMatchUser1(username, password) != null;
+        } else {
+            return userMapper.hasMatchUser2(username, password) != null;
+        }
+    }
+
+    //User
+
+    @RequestMapping(value = "/user/ude", method = RequestMethod.GET)
+    public String userDoExist(String name) throws Exception {
+        return userMapper.hasMatcherUsername(name) == 0 ? "0" : "1";
+
+    }
+
+    @RequestMapping(value = "/user/ul", method = RequestMethod.POST)
+    public String userLogin(String un, String pwd) {
+        try {
+            return isLegalUser(un, pwd) ? "1" : "0";
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "0";
+    }
+}
